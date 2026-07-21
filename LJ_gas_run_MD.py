@@ -81,6 +81,8 @@ box_length = 100      # nm
 tau_thermostat = 1  # thermostat coupling constant in 1/ps
 rij_min = 1e-2      # nm
 NVT = True          # switch to decide between NVT and NVE
+attractor_position = [50, 50, 50]   # position of the attractive minimum
+attractor_coefficient = 0.5       # coefficient k for the potential V(r) = kr**2
 
 # output
 file_name_base = "my_simulation"  # file name for all output files
@@ -99,7 +101,9 @@ sim = SimulationParameters(dt = dt,
                            temperature = temperature, 
                            box_length = box_length, 
                            tau_thermostat = tau_thermostat,
-                           rij_min=rij_min
+                           rij_min=rij_min,
+                           attractor_position = attractor_position,
+                           attractor_coefficient = attractor_coefficient
                            )
 
 #

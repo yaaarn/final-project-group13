@@ -1,0 +1,6 @@
+__pycache__/
+*.png
+*.xyz
+*.out
+*.dat
+*.npy

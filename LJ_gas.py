@@ -72,13 +72,15 @@ class ParticleSystem:
 
 
 class SimulationParameters:
-    def __init__(self, dt, n_steps, temperature, box_length, tau_thermostat = None, rij_min=0.0, ):
+    def __init__(self, dt, n_steps, temperature, box_length, attractor_position, attractor_coefficient, tau_thermostat = None, rij_min=0.0, ):
         """
         Parameters:
             dt (float): Time step in ps.
             n_steps (int): Number of time steps.
             temperature (float): Temperature in K.
             box_length (float): Length of the (cubic) simulation box in nm.
+            attractor_position (list): Coordinates of the attractive minimum in nm.
+            attractor_coefficient (float): Coefficient of the potential function.
 
         Parameters with default values: 
             tau_thermostat (float or None) = None: Thermostat coupling constant in ps
@@ -91,6 +93,8 @@ class SimulationParameters:
         self.box_length = box_length  # in nm
         self.tau_thermostat = tau_thermostat  # thermostat coupling time in ps
         self.rij_min = rij_min        # minimum allowed pairwise distance
+        self.attractor_position = attractor_position
+        self.attractor_coefficient = attractor_coefficient
 
         # Optional: friction coefficient for Langevin or stochastic thermostats
         self.xi = None
@@ -286,13 +290,17 @@ def calculate_force(ps: ParticleSystem, sim: SimulationParameters):
     sigma = ps.sigma[0]
     epsilon = ps.epsilon[0]
     L = sim.box_length
+    attractor_position = sim.attractor_position
+    k = sim.attractor_coefficient
 
+    #Add attractive minimum point to the list of particles
+    pos_sink = np.append(ps.position, [np.array(attractor_position)], axis=0)
 
     # vectorized code to calculate the pairwise distances
     # positions[:, np.newaxis, :] has shape (N, 1, 3)
     # positions[np.newaxis, :, :] has shape (1, N, 3)
     # The difference broadcasted has shape (N, N, 3)
-    rij_matrix = ps.position[:, np.newaxis, :] - ps.position[np.newaxis, :, :]
+    rij_matrix = pos_sink[:, np.newaxis, :] - pos_sink[np.newaxis, :, :]
     
     # apply periodic boundary conditions
     rij_matrix -= L * np.rint(rij_matrix / L)
@@ -306,6 +314,9 @@ def calculate_force(ps: ParticleSystem, sim: SimulationParameters):
     # Get list of unique distance vectors and unique distances
     rij = rij_matrix[i_upper]                       # shape (N_pairs, 3)    
     r = r_matrix[i_upper]                           # shape (N_pairs,)
+    #distances of all the particles to the attractive minimum
+    rij_sink = rij_matrix[-1, :-1]
+    r_sink = r_matrix[-1, :-1]                           # shape (N)
     
     # reset distances < rij_min  to rij_min to make sure
     # that the sr6**2 term is numerically stable
@@ -315,14 +326,25 @@ def calculate_force(ps: ParticleSystem, sim: SimulationParameters):
     rij = rij / np.linalg.norm(rij, axis=1)[:, np.newaxis]  # normalize each rij
     rij *= r[:, np.newaxis]                                 # rescale to clipped r
 
+    #normalize rij_sink to unit vectors
+    rij_sink = rij_sink / np.linalg.norm(rij_sink, axis=1)[:, np.newaxis]
+    rij_sink *= r_sink[:, np.newaxis]
+
     # Lennard-Jones force magnitude: dV/dr
     sr6 = (sigma / r)**6                            # shape (N_pairs,)
     dV_dr = 24 * epsilon / r * (-2 * sr6**2 + sr6)  # shape (N_pairs,)
+
+    #Force magnitude of the external potential acting on each particle
+    #F = dV/dr = d(kr**2)/dr = 2kr
+    f_sink = k * (2) * r_sink # shape (N)
 
     # Force vectors: shape (N_pairs, 3)
     # dV_dr[:, np.newaxis] shapes it to (N_pairs, 1), i.e. 2D column vector
     # broadcasting to rij with shape (N_pairs, 3) is then possible
     f_ij = (dV_dr[:, np.newaxis] / r[:, np.newaxis]) * rij
+
+    #external potential force vectors
+    fij_sink = f_sink[:, np.newaxis] * rij_sink     # shape (N, 3)
 
     # Initialize total force array
     force = np.zeros_like(ps.position)  # shape (N, 3)
@@ -331,6 +353,9 @@ def calculate_force(ps: ParticleSystem, sim: SimulationParameters):
     for idx, (i, j) in enumerate(zip(i_upper[0], i_upper[1])):
         force[i] -= f_ij[idx]
         force[j] += f_ij[idx]
+
+    #Add external potential forces to particle interaction forces
+    force += fij_sink
 
     # update the force vector in the ParticleSystem class
     ps.force = force
