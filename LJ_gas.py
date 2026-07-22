@@ -271,6 +271,47 @@ def ideal_gas_pressure(ps: ParticleSystem, sim: SimulationParameters) -> float:
     T = instantaneous_temperature(ps)  # in Kelvin
 
     return n_mol * R * T / V_in_m3  # Pressure in Pascals (Pa)
+
+def average_distance(ps: ParticleSystem, sim: SimulationParameters) -> float:
+    """
+    Computes the total Lennard-Jones potential energy of the system.
+    
+    Assumes uniform Lennard-Jones parameters:
+        epsilon and sigma (taken from particle 0)
+    
+    Units:
+        Energy is in the same units as epsilon (kJ/mol).
+        Positions must be in the same units as sigma (nm).
+    """
+    n_particles = ps.n
+    L = sim.box_length
+        
+    # vectorized code to calculate the pairwise distances
+    # positions[:, np.newaxis, :] has shape (N, 1, 3)
+    # positions[np.newaxis, :, :] has shape (1, N, 3)
+    # The difference broadcasted has shape (N, N, 3)
+    rij_matrix = ps.position[:, np.newaxis, :] - ps.position[np.newaxis, :, :]
+    
+    # apply periodic boundary conditions
+    rij_matrix -= L * np.rint(rij_matrix / L)
+    
+    # Pairwise distances (shape: N, N)
+    r_matrix = np.linalg.norm(rij_matrix, axis=-1)  
+
+    # Extract upper triangle indices (i < j), i.e. the list of unique pairs
+    i_upper = np.triu_indices(n_particles, k=1)
+    
+    # Get list of unique distance vectors and unique distances
+    r = r_matrix[i_upper]                           # shape (N_pairs,)
+
+    # reset the very small distance to 0.00001 nm to make sure
+    # that the sr6**2 term is numerically stable
+    r = np.clip(r, sim.rij_min, None)
+
+    # Average distance between particles
+    avg_dist = np.average(r)
+    
+    return avg_dist
     
 #--------------------------------------
 # MD integrators

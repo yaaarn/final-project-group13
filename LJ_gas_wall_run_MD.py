@@ -38,7 +38,8 @@ from LJ_gas_wall import(
     potential_energy,
     kinetic_energy,
     instantaneous_temperature,
-    ideal_gas_pressure
+    ideal_gas_pressure,
+    calculate_bound_particles
     )
 
 #----------------------------------------------------------------
@@ -71,7 +72,7 @@ def toc():
 n_particles = 200
 mass_argon =  39.95             # mass in u = 1e-3 kg/mol
 sigma_argon = 0.34              # sigma in nm     Argon: 0.34
-epsilon_argon = 120*R*1e-3      # epsilon in kJ/mol Argon: 120
+epsilon_argon = 600*R*1e-3      # epsilon in kJ/mol Argon: 120
 
 # simulation
 dt = 0.1             # ps
@@ -137,11 +138,12 @@ position_trajectory = np.zeros((sim.n_steps+1, n_particles, 3))
 position_trajectory[0,:,:] = ps.position # initial position
 
 # initialize energy trajectory
-energy_trajectory = np.zeros((sim.n_steps+1, 4))
-energy_trajectory[0,0] = potential_energy( ps, sim)       # potential energy
-energy_trajectory[0,1] = kinetic_energy(ps)               # kinetic energy
-energy_trajectory[0,2] = instantaneous_temperature(ps)    # instantaneous pressure
-energy_trajectory[0,3] = ideal_gas_pressure(ps, sim)      # ideal gas pressure
+energy_trajectory = np.zeros((sim.n_steps+1, 5))
+energy_trajectory[0,0] = potential_energy( ps, sim)         # potential energy
+energy_trajectory[0,1] = kinetic_energy(ps)                 # kinetic energy
+energy_trajectory[0,2] = instantaneous_temperature(ps)      # instantaneous pressure
+energy_trajectory[0,3] = ideal_gas_pressure(ps, sim)        # ideal gas pressure
+energy_trajectory[0,4] = calculate_bound_particles(ps, sim) # bound particles
 
 
 #--------------------------------------------------
@@ -157,10 +159,11 @@ for i in range(sim.n_steps):
     position_trajectory[i+1,:,:] = ps.position # store updated positions
 
     # store updated energies, temperature and pressure
-    energy_trajectory[i+1,0] = potential_energy( ps, sim)     # potential energy
-    energy_trajectory[i+1,1] = kinetic_energy(ps)             # kinetic energy
-    energy_trajectory[i+1,2] = instantaneous_temperature(ps)  # instantaneous pressure
-    energy_trajectory[i+1,3] = ideal_gas_pressure(ps, sim)    # ideal gas pressure
+    energy_trajectory[i+1,0] = potential_energy( ps, sim)           # potential energy
+    energy_trajectory[i+1,1] = kinetic_energy(ps)                   # kinetic energy
+    energy_trajectory[i+1,2] = instantaneous_temperature(ps)        # instantaneous pressure
+    energy_trajectory[i+1,3] = ideal_gas_pressure(ps, sim)          # ideal gas pressure
+    energy_trajectory[i+1,4] = calculate_bound_particles(ps, sim)   # bound particles
 
 
 #--------------------------------------
@@ -170,7 +173,7 @@ for i in range(sim.n_steps):
 write_xyz_trajectory(file_name_base + "_pos.xyz", position_trajectory, atom_symbol="Ar")
 # write energy trajectory to file (binary and text)
 np.save(file_name_base + "_ene.npy", energy_trajectory)
-np.savetxt(file_name_base + "_ene.dat", energy_trajectory, fmt="%.6e", header="#E_pot  E_kin  T  P", comments='')
+np.savetxt(file_name_base + "_ene.dat", energy_trajectory, fmt="%.6e", header="#E_pot  E_kin  T  P N_bound", comments='')
 
 
 #----------------------------------------------------
@@ -237,6 +240,21 @@ plt.xlabel("time [ps]", fontsize=14)
 plt.ylabel("P [Pa]", fontsize=14)
 
 plt.savefig(file_name_base + "_P.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+#
+# N bound
+#
+N_bound_min = 0   # lower limit of N_bound axis
+N_bound_max = np.mean(energy_trajectory[:,4]) + 10   # upper limit of N_bound axis 
+
+plt.figure(figsize=(8, 6))
+plt.plot(time_ps, energy_trajectory[:,4]) 
+plt.ylim(N_bound_min, N_bound_max)
+plt.xlabel("time [ps]", fontsize=14)
+plt.ylabel("N_bound", fontsize=14)
+
+plt.savefig(file_name_base + "_Nbound.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 

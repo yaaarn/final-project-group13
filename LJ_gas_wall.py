@@ -302,7 +302,7 @@ def calculate_force(ps: ParticleSystem, sim: SimulationParameters):
 
     # Normal vector and arbitrary point on the plane
     n = wall_equation[:3]
-    P = np.array([wall_equation[3]/np.max(wall_equation[0], 1e-10), 0, 0])
+    P = np.array([wall_equation[3]/np.maximum(wall_equation[0], 1e-10), 0, 0])
 
     # calculate distance from wall for each particle
     r_wall = np.dot(P - ps.position, n)
@@ -531,6 +531,31 @@ def apply_periodic_boundary(ps: ParticleSystem, sim: SimulationParameters):
     # x >= L : x/L = 1*L + remainder => return remainder => shifts x by L to the left
     ps.position = np.mod(ps.position, L)
     
+def calculate_bound_particles(ps: ParticleSystem, sim: SimulationParameters):
+    """
+    Checks if particles are bound to the soft attractive wall.
+    Returns number of particles within boundary conditions.
+    """
+    L = sim.box_length
+    wall_equation = np.array(sim.wall_equation, dtype=float)
+
+
+    # Normalize normal vector
+    wall_equation /= np.linalg.norm(wall_equation[:3])
+
+    # Normal vector and arbitrary point on the plane
+    n = wall_equation[:3]
+    P = np.array([wall_equation[3]/np.maximum(wall_equation[0], 1e-10), 0, 0])
+
+    # calculate distance from wall for each particle
+    r_wall = np.dot(P - ps.position, n)
+    
+    # apply periodic boundary conditions
+    r_wall -= L * np.rint(r_wall / L)
+
+    bounded = np.absolute(r_wall) < 0.5
+
+    return np.sum(bounded)
 
 #--------------------------------------
 # Output

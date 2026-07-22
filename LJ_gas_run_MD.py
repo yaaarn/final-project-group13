@@ -38,7 +38,8 @@ from LJ_gas import(
     potential_energy,
     kinetic_energy,
     instantaneous_temperature,
-    ideal_gas_pressure
+    ideal_gas_pressure,
+    average_distance
     )
 
 #----------------------------------------------------------------
@@ -82,7 +83,7 @@ tau_thermostat = 1  # thermostat coupling constant in 1/ps
 rij_min = 1e-2      # nm
 NVT = True          # switch to decide between NVT and NVE
 attractor_position = [50, 50, 50]   # position of the attractive minimum
-attractor_coefficient = 0.5       # coefficient k for the potential V(r) = kr**2
+attractor_coefficient = 0.2e-2         # coefficient k for the potential V(r) = kr**2
 
 # output
 file_name_base = "my_simulation"  # file name for all output files
@@ -139,11 +140,12 @@ position_trajectory = np.zeros((sim.n_steps+1, n_particles, 3))
 position_trajectory[0,:,:] = ps.position # initial position
 
 # initialize energy trajectory
-energy_trajectory = np.zeros((sim.n_steps+1, 4))
+energy_trajectory = np.zeros((sim.n_steps+1, 5))
 energy_trajectory[0,0] = potential_energy( ps, sim)       # potential energy
 energy_trajectory[0,1] = kinetic_energy(ps)               # kinetic energy
 energy_trajectory[0,2] = instantaneous_temperature(ps)    # instantaneous pressure
 energy_trajectory[0,3] = ideal_gas_pressure(ps, sim)      # ideal gas pressure
+energy_trajectory[0,4] = average_distance(ps, sim)        # average distance
 
 
 #--------------------------------------------------
@@ -163,6 +165,7 @@ for i in range(sim.n_steps):
     energy_trajectory[i+1,1] = kinetic_energy(ps)             # kinetic energy
     energy_trajectory[i+1,2] = instantaneous_temperature(ps)  # instantaneous pressure
     energy_trajectory[i+1,3] = ideal_gas_pressure(ps, sim)    # ideal gas pressure
+    energy_trajectory[i+1,4] = average_distance(ps, sim)      # average distance
 
 
 #--------------------------------------
@@ -241,6 +244,20 @@ plt.ylabel("P [Pa]", fontsize=14)
 plt.savefig(file_name_base + "_P.png", dpi=300, bbox_inches='tight')
 plt.show()
 
+#
+# average distance
+#
+avg_dist_min = np.mean(energy_trajectory[:,4]) - 10   # lower limit of avg_dist axis
+avg_dist_max = np.mean(energy_trajectory[:,4]) + 10   # upper limit of avg_dist axis 
+
+plt.figure(figsize=(8, 6))
+plt.plot(time_ps, energy_trajectory[:,4]) 
+plt.ylim(avg_dist_min, avg_dist_max)
+plt.xlabel("time [ps]", fontsize=14)
+plt.ylabel("avg_dist [nm]", fontsize=14)
+
+plt.savefig(file_name_base + "_avgdist.png", dpi=300, bbox_inches='tight')
+plt.show()
 
 #--------------------------------------
 # O U T P U T 
